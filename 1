@@ -1,0 +1,157 @@
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+
+class BancoDeDado
+{
+    private string connectionString;
+
+    // Construtor que recebe a connection string do banco de dados
+    public BancoDeDado(string connectionString)
+    {
+        this.connectionString = connectionString;
+    }
+
+    // Método para inserir um registro em uma tabela
+    public void Inserir(string tabela, string[] valores)
+    {
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            connection.Open();
+
+            // Monta a query SQL de inserção
+            string insertQuery = $"INSERT INTO {tabela} VALUES ('{string.Join("', '", valores)}')";
+            SqlCommand command = new SqlCommand(insertQuery, connection);
+
+            // Executa a query de inserção
+            command.ExecuteNonQuery();
+        }
+    }
+
+    // Método para ler todos os registros de uma tabela
+    public List<string[]> Ler(string tabela)
+    {
+        List<string[]> resultados = new List<string[]>();
+
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            connection.Open();
+
+            // Monta a query SQL de seleção
+            string selectQuery = $"SELECT * FROM {tabela}";
+            SqlCommand command = new SqlCommand(selectQuery, connection);
+
+            // Executa a query de seleção
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+                // Itera sobre os resultados e os adiciona à lista de resultados
+                while (reader.Read())
+                {
+                    string[] resultado = new string[reader.FieldCount];
+
+                    // Para cada coluna do resultado, adiciona o valor ao array de resultados
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        resultado[i] = reader[i].ToString();
+                    }
+
+                    resultados.Add(resultado);
+                }
+            }
+        }
+
+        return resultados;
+    }
+}
+
+class Produto
+{
+    public int Id { get; set; }
+    public string Nome { get; set; }
+    public string Categoria { get; set; }
+    public decimal Preco { get; set; }
+    public int Estoque { get; set; }
+
+    // Construtor da classe Produto
+    public Produto(string nome, string categoria, decimal preco, int estoque)
+    {
+        Nome = nome;
+        Categoria = categoria;
+        Preco = preco;
+        Estoque = estoque;
+    }
+}
+
+class ProdutoDAO
+{
+    private BancoDeDado db;
+
+    public ProdutoDAO(string connectionString)
+    {
+        db = new BancoDeDado(connectionString);
+    }
+
+    public void InserirProduto(Produto produto)
+    {
+        string[] valoresProduto = { produto.Nome, produto.Categoria, produto.Preco.ToString(), produto.Estoque.ToString() };
+        db.Inserir("Produtos", valoresProduto);
+    }
+
+    public List<Produto> LerProdutos()
+    {
+        List<Produto> produtos = new List<Produto>();
+
+        List<string[]> resultados = db.Ler("Produtos");
+        foreach (var resultado in resultados)
+        {
+            Produto produto = new Produto(resultado[1], resultado[2], decimal.Parse(resultado[3]), int.Parse(resultado[4]));
+            produto.Id = int.Parse(resultado[0]);
+            produtos.Add(produto);
+        }
+
+        return produtos;
+    }
+}
+
+class Program
+{
+    static void Main()
+    {
+        string connectionString = "Data Source=DESKTOP-97CJOEQ;Initial Catalog=ExemploDB;Integrated Security=True";
+        ProdutoDAO produtoDAO = new ProdutoDAO(connectionString);
+        while (true)
+        {
+            Console.WriteLine("Deseja cadastrar um novo produto? Digite 1");
+            Console.WriteLine("Deseja ver os produtos disponiveis? Digite 2");
+            string op = Console.ReadLine();
+            switch (op)
+            {
+                case "1":
+                    // Solicitar ao usuário os detalhes do produto
+                    Console.Write("Nome do Produto: ");
+                    string nome = Console.ReadLine();
+                    Console.Write("Categoria do Produto: ");
+                    string categoria = Console.ReadLine();
+                    Console.Write("Preço do Produto: ");
+                    decimal preco = decimal.Parse(Console.ReadLine());
+                    Console.Write("Estoque do Produto: ");
+                    int estoque = int.Parse(Console.ReadLine());
+                    // Criar um novo produto
+                    Produto novoProduto = new Produto(nome, categoria, preco, estoque);
+                    // Inserir o novo produto no banco de dados
+                    produtoDAO.InserirProduto(novoProduto);
+                    break;
+                case "2":
+                    // Ler todos os produtos do banco de dados
+                    List<Produto> produtos = produtoDAO.LerProdutos();
+                    foreach (var produto in produtos)
+                    {
+                        Console.WriteLine($"Id: {produto.Id}, Nome: {produto.Nome}, Categoria: {produto.Categoria}, Preço: {produto.Preco}, Estoque: {produto.Estoque}");
+                    }
+                    Console.WriteLine("Digite ENTER para continuar");
+                    string enter = Console.ReadLine();
+                    break;
+            }
+        }
+    }
+}
